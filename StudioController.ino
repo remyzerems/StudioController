@@ -1,5 +1,8 @@
 #include "arduino_secrets.h"
 
+// Define hostname of the studio controller board
+#define CONTROLLER_HOSTNAME     "StudioController"
+
 /**********  AUDIO HARDWARE SWITCHING  *****************/
 #include <RCSwitch.h>
 RCSwitch mySwitch = RCSwitch();
@@ -7,7 +10,7 @@ RCSwitch mySwitch = RCSwitch();
 static const RCSwitch::Protocol chacon_54662_protocol = { 105, { 3, 22  }, { 10, 4  }, {  3, 11 }, false };
 
 // Microcontroller pin used to send RF messages to the RC sockets
-#define RF_TRANSMITTER_TXD          D9
+#define RF_TRANSMITTER_TXD          D10
 // Number of RF transmission repetitions
 #define RF_REPEAT_COUNT             4
 // Define the RF protocol to use
@@ -18,7 +21,7 @@ static const RCSwitch::Protocol chacon_54662_protocol = { 105, { 3, 22  }, { 10,
 #define SPEAKERS                    RF_SOCKET_B
 
 // Define timings
-#define AUDIO_TO_SPEAKER_DELAY_MS   2000
+#define AUDIO_TO_SPEAKER_DELAY_MS   8000
 
 // Helper macros
 #define GET_CODE(element, state)           GET_CODE_EX(element, state)
@@ -29,7 +32,7 @@ static const RCSwitch::Protocol chacon_54662_protocol = { 105, { 3, 22  }, { 10,
 #include <ArduinoOSCWiFi.h>
 
 // Digital output pin to which the light sign is connected
-#define RECORD_TALLY_CONTROL_PIN      D10
+#define RECORD_TALLY_CONTROL_PIN      D0
 
 // This is a bit field to ask Ardour which feedback we'd like to get
 // Please refer to https://manual.ardour.org/using-control-surfaces/controlling-ardour-with-osc/calculating-feedback-and-strip-types-values/#feedback
@@ -66,6 +69,7 @@ void setup() {
     pinMode(RECORD_TALLY_CONTROL_PIN, OUTPUT);
 
     // WiFi stuff
+    WiFi.setHostname(CONTROLLER_HOSTNAME);
     WiFi.begin(ssid, pwd);
 
     // Subscribe to Ardour OSC route /rec_enable_toggle
@@ -75,7 +79,7 @@ void setup() {
             Serial.print(i); Serial.println();
 
             // Set record tally control pin to high or low depending on the rec_enable_toggle value
-            digitalWrite(RECORD_TALLY_CONTROL_PIN, (i != 0 ? HIGH : LOW));
+            switchTallyLight((i != 0 ? true : false));
         }
     );
 
@@ -146,4 +150,22 @@ void loop() {
       delay(AUDIO_TO_SPEAKER_DELAY_MS);
       mySwitch.send(GET_CODE(AUDIO_OUTPUTS, OFF));
     }
+
+    if(command.indexOf("switch-tally-on") >= 0)
+    {
+      Serial.println("Switching tally light ON");
+
+      switchTallyLight(true);
+    }
+    if(command.indexOf("switch-tally-off") >= 0)
+    {
+      Serial.println("Switching tally light OFF");
+
+      switchTallyLight(false);
+    }
+}
+
+void switchTallyLight(bool on)
+{
+  digitalWrite(RECORD_TALLY_CONTROL_PIN, (on == true ? HIGH : LOW));
 }
